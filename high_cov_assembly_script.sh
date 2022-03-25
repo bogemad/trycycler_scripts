@@ -74,7 +74,8 @@ for ass in flye miniasm raven redbean necat shasta; do
 				echo "Running $ass assembly $i"
 				seqtk sample -s "$i" $freads "$read_count" | paste - - - - | shuf | tr '\t' '\n' > $sreads
 				wtdbg2 -o $workdir/assembly -g "$genome_size" -t "$threads" -x ont -i $sreads &> $logs/$ass.$i.log.txt && echo "$ass assembly $i successful" || echo "$ass assembly $i failed" 
-				mv $workdir/assembly.cns.fa $out_dir/assemblies/$sample_name.$ass."$i".fasta
+				wtpoa-cns -t "$threads" -i $workdir/assembly.ctg.lay.gz -o $workdir/assembly.ctg.fasta &> $logs/$ass.$i.cns.log.txt && echo "$ass cns assembly $i successful" || echo "$ass cns assembly $i failed"
+				mv $workdir/assembly.ctg.fasta $out_dir/assemblies/$sample_name.$ass."$i".fasta
 				rm -r $workdir
 			fi
 		done
@@ -112,9 +113,9 @@ FSA_CTG_BRIDGE_OPTIONS=
 POLISH_CONTIGS=true
 " > $workdir/assembly.config
 				cd $workdir/
-				necat correct $workdir/assembly.config &> $logs/$ass.$i.correct.log.txt && echo "$ass correct $i successful" || echo "$ass correct $i failed" 
-				necat assemble $workdir/assembly.config &> $logs/$ass.$i.assemble.log.txt && echo "$ass assemble $i successful" || echo "$ass assemble $i failed" 
-				necat bridge $workdir/assembly.config &> $logs/$ass.$i.bridge.log.txt && echo "$ass bridge $i successful" || echo "$ass bridge $i failed" 
+				necat.pl correct $workdir/assembly.config &> $logs/$ass.$i.correct.log.txt && echo "$ass correct $i successful" || echo "$ass correct $i failed" 
+				necat.pl assemble $workdir/assembly.config &> $logs/$ass.$i.assemble.log.txt && echo "$ass assemble $i successful" || echo "$ass assemble $i failed" 
+				necat.pl bridge $workdir/assembly.config &> $logs/$ass.$i.bridge.log.txt && echo "$ass bridge $i successful" || echo "$ass bridge $i failed" 
 				cd -
 				mv $workdir/assembly/6-bridge_contigs/polished_contigs.fasta $out_dir/assemblies/$sample_name.$ass."$i".fasta
 				rm -r $workdir
