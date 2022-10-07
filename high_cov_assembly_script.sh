@@ -11,7 +11,7 @@ out_dir=$(readlink -f $5)
 logs=$out_dir/logs
 
 mkdir -p $out_dir/filtlong/
-freads=$out_dir/filtlong/$sample_name.minion.fastq.gz
+freads=$out_dir/filtlong/$sample_name.minion.fastq
 
 if [ ! -e $freads ]; then
 filtlong --min_length 1000 --keep_percent 95 $reads > $freads || exit 1
@@ -23,7 +23,7 @@ mkdir -p $out_dir/assemblies
 
 mkdir -p $logs
 
-for ass in flye miniasm raven redbean necat shasta; do
+for ass in flye miniasm raven necat; do
 	if [[ $ass == "flye" ]]; then #Assemble w/ Flye
 		for i in {1..3}; do
 			if [ ! -e $out_dir/assemblies/$sample_name.$ass."$i".fasta ]; then
@@ -85,37 +85,37 @@ for ass in flye miniasm raven redbean necat shasta; do
 				rm -r $workdir
 			fi
 		done
-	elif [[ $ass == "redbean" ]]; then #Assemble w/ Redbean
-		for i in {1..3}; do
-			if [ ! -e $out_dir/assemblies/$sample_name.$ass."$i".fasta ]; then
-				workdir=$out_dir/$sample_name.$ass
-				mkdir -p $workdir
-				sreads=$workdir/read_sample."$i".fastq
-				echo "Running $ass assembly $i"
-				seqtk sample -s "$i" $freads "$read_count" | paste - - - - | shuf | tr '\t' '\n' > $sreads
-				wtdbg2 -o $workdir/assembly -g "$genome_size" -t "$threads" -x ont -i $sreads &> $logs/$ass.$i.log.txt
-				RESULT=$?
-				if [ $RESULT -eq 0 ]; then
-					echo "$ass assembly $i successful"
-					wtpoa-cns -t "$threads" -i $workdir/assembly.ctg.lay.gz -fo $workdir/assembly.cns.fa &>> $logs/$ass.$i.log.txt
-				else
-					echo "$ass assembly $i failed"
-					rm -r $workdir
-					continue
-				fi	
-				RESULT2=$?
-				if [ $RESULT2 -eq 0 ]; then
-					echo "$ass consensus $i successful"
-					mv $workdir/assembly.cns.fa $out_dir/assemblies/$sample_name.$ass."$i".fasta
-					assembly-stats $out_dir/assemblies/$sample_name.$ass."$i".fasta | grep -E 'sum|N50'
-				else
-					echo "$ass consensus $i failed" 
-					rm -r $workdir
-					continue
-				fi	
-				rm -r $workdir
-			fi
-		done
+	# elif [[ $ass == "redbean" ]]; then #Assemble w/ Redbean
+	# 	for i in {1..3}; do
+	# 		if [ ! -e $out_dir/assemblies/$sample_name.$ass."$i".fasta ]; then
+	# 			workdir=$out_dir/$sample_name.$ass
+	# 			mkdir -p $workdir
+	# 			sreads=$workdir/read_sample."$i".fastq
+	# 			echo "Running $ass assembly $i"
+	# 			seqtk sample -s "$i" $freads "$read_count" | paste - - - - | shuf | tr '\t' '\n' > $sreads
+	# 			wtdbg2 -o $workdir/assembly -g "$genome_size" -t "$threads" -x ont -i $sreads &> $logs/$ass.$i.log.txt
+	# 			RESULT=$?
+	# 			if [ $RESULT -eq 0 ]; then
+	# 				echo "$ass assembly $i successful"
+	# 				wtpoa-cns -t "$threads" -i $workdir/assembly.ctg.lay.gz -fo $workdir/assembly.cns.fa &>> $logs/$ass.$i.log.txt
+	# 			else
+	# 				echo "$ass assembly $i failed"
+	# 				rm -r $workdir
+	# 				continue
+	# 			fi	
+	# 			RESULT2=$?
+	# 			if [ $RESULT2 -eq 0 ]; then
+	# 				echo "$ass consensus $i successful"
+	# 				mv $workdir/assembly.cns.fa $out_dir/assemblies/$sample_name.$ass."$i".fasta
+	# 				assembly-stats $out_dir/assemblies/$sample_name.$ass."$i".fasta | grep -E 'sum|N50'
+	# 			else
+	# 				echo "$ass consensus $i failed" 
+	# 				rm -r $workdir
+	# 				continue
+	# 			fi	
+	# 			rm -r $workdir
+	# 		fi
+	# 	done
 	elif [[ $ass == "necat" ]]; then #Assemble w/ necat
 		for i in {1..3}; do
 			if [ ! -e $out_dir/assemblies/$sample_name.$ass."$i".fasta ]; then
@@ -186,26 +186,26 @@ POLISH_CONTIGS=true
 				rm -r $workdir
 			fi
 		done
-	elif [[ $ass == "shasta" ]]; then #Assemble w/ necat
-		for i in {1..3}; do
-			if [ ! -e $out_dir/assemblies/$sample_name.$ass."$i".fasta ]; then
-				workdir=$out_dir/$sample_name.$ass
-				mkdir -p $workdir
-				sreads=$workdir/read_sample."$i".fastq
-				echo "Running $ass assembly $i"
-				seqtk sample -s "$i" $freads "$read_count" | paste - - - - | shuf | tr '\t' '\n' > $sreads
-				shasta --input $sreads --config Nanopore-May2022 --assemblyDirectory $workdir/assembly --threads $threads --Reads.minReadLength 1000 &> $logs/$ass.$i.log.txt
-				RESULT=$?
-				if [ $RESULT -eq 0 ]; then
-					echo "$ass assembly $i successful"
-					mv $workdir/assembly/Assembly.fasta $out_dir/assemblies/$sample_name.$ass."$i".fasta
-					assembly-stats $out_dir/assemblies/$sample_name.$ass."$i".fasta | grep -E 'sum|N50'
-				else
-					echo "$ass assembly $i failed"
-				fi
-				rm -r $workdir
-			fi
-		done
+	# elif [[ $ass == "shasta" ]]; then #Assemble w/ necat
+	# 	for i in {1..3}; do
+	# 		if [ ! -e $out_dir/assemblies/$sample_name.$ass."$i".fasta ]; then
+	# 			workdir=$out_dir/$sample_name.$ass
+	# 			mkdir -p $workdir
+	# 			sreads=$workdir/read_sample."$i".fastq
+	# 			echo "Running $ass assembly $i"
+	# 			seqtk sample -s "$i" $freads "$read_count" | paste - - - - | shuf | tr '\t' '\n' > $sreads
+	# 			shasta --input $sreads --config Nanopore-May2022 --assemblyDirectory $workdir/assembly --threads $threads --Reads.minReadLength 1000 &> $logs/$ass.$i.log.txt
+	# 			RESULT=$?
+	# 			if [ $RESULT -eq 0 ]; then
+	# 				echo "$ass assembly $i successful"
+	# 				mv $workdir/assembly/Assembly.fasta $out_dir/assemblies/$sample_name.$ass."$i".fasta
+	# 				assembly-stats $out_dir/assemblies/$sample_name.$ass."$i".fasta | grep -E 'sum|N50'
+	# 			else
+	# 				echo "$ass assembly $i failed"
+	# 			fi
+	# 			rm -r $workdir
+	# 		fi
+	# 	done
 	else
 		echo "Ass is wrong. BITCH!"
 		exit 1
