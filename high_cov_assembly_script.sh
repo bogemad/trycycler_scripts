@@ -9,6 +9,7 @@ genome_size=$3
 threads=$4
 out_dir=$(readlink -f $5)
 logs=$out_dir/logs
+python_version="3.10"
 
 mkdir -p $out_dir/filtlong/
 freads=$out_dir/filtlong/$sample_name.minion.fastq
@@ -23,7 +24,7 @@ mkdir -p $out_dir/assemblies
 
 mkdir -p $logs
 
-for ass in flye miniasm raven necat; do
+for ass in flye miniasm raven necat nextdenovo ; do
 	if [[ $ass == "flye" ]]; then #Assemble w/ Flye
 		for i in {1..3}; do
 			if [ ! -e $out_dir/assemblies/$sample_name.$ass."$i".fasta ]; then
@@ -206,6 +207,66 @@ POLISH_CONTIGS=true
 	# 			rm -r $workdir
 	# 		fi
 	# 	done
+	elif [[ $ass == "nextdenovo" ]]; then #Assemble w/ Nextdenovo and polish with Nextpolish
+		for i in {1..3}; do
+			echo $ass $i
+			if [ ! -e $out_dir/assemblies/$sample_name.$ass."$i".fasta ]; then
+				workdir=$out_dir/$sample_name.$ass
+				mkdir -p $workdir
+				sreads=$workdir/read_sample."$i".fastq
+				echo "Running $ass assembly $i"
+				seqtk sample -s "$i" $freads "$read_count" | paste - - - - | shuf | tr '\t' '\n' > $sreads
+
+				echo $sreads > $workdir/input.fofn
+
+				cp /home/"$USER"/miniconda3/envs/"$CONDA_DEFAULT_ENV"/lib/python$python_version/site-packages/nextdenovo/doc/run.cfg $out_dir/nextdenovo_run.cfg
+				sed -i "s/genome_size = 1g/genome_size = "$genome_size"/" $out_dir/nextdenovo_run.cfg
+				sed -i "s/parallel_jobs = 20/parallel_jobs = 1/" $out_dir/nextdenovo_run.cfg
+				sed -i "s/read_type = clr/read_type = ont/" $out_dir/nextdenovo_run.cfg
+				sed -i "s/pa_correction = 3/pa_correction = 1/" $out_dir/nextdenovo_run.cfg
+				sed -i "s/correction_options = -p 15/correction_options = -p "$threads"/" $out_dir/nextdenovo_run.cfg
+				sed -i "s/-t 8/-t "$threads"/" $out_dir/nextdenovo_run.cfg
+				sed -i "s#input_fofn = input\.fofn#input_fofn = "$workdir"/input.fofn#" $out_dir/nextdenovo_run.cfg
+				sed -i "s#workdir = 01_rundir#workdir = "$workdir"/01_rundir#" $out_dir/nextdenovo_run.cfg
+
+				nextDenovo $out_dir/nextdenovo_run.cfg 2> $logs/$ass.$i.log.txt
+				cp $workdir/01_rundir/03.ctg_graph/nd.asm.fasta $workdir/nextdenovo_temp.$i.fasta
+				rm -r $workdir/01_rundir  $out_dir/nextdenovo_run.cfg $workdir/input.fofn
+				
+				echo $sreads > $workdir/lgs.fofn
+				echo "[General]
+job_type = local
+job_prefix = nextPolish
+task = best
+rewrite = yes
+deltmp = yes
+rerun = 3
+parallel_jobs = 1
+multithread_jobs = $threads
+genome = $workdir/nextdenovo_temp.$i.fasta
+genome_size = auto
+workdir = $workdir/01_rundir
+polish_options = -p {multithread_jobs}
+
+[lgs_option] #optional
+lgs_fofn = $workdir/lgs.fofn
+lgs_options = -min_read_len 1k -max_depth 100
+lgs_minimap2_options = -x map-ont -t $threads
+" > $out_dir/nextpolish_run.cfg
+
+
+				nextPolish $out_dir/nextpolish_run.cfg 2> $logs/$ass.$i.nextpolish.log.txt
+				RESULT=$?
+				if [ $RESULT -eq 0 ]; then
+					echo "$ass assembly $i successful"
+					cp $workdir/01_rundir/genome.nextpolish.fasta $out_dir/assemblies/$sample_name.$ass."$i".fasta
+					assembly-stats $out_dir/assemblies/$sample_name.$ass."$i".fasta | grep -E 'sum|N50'
+				else
+					echo "$ass assembly $i failed"
+				fi
+				rm -r $workdir $out_dir/nextpolish_run.cfg
+			fi
+		done
 	else
 		echo "Ass is wrong. BITCH!"
 		exit 1
